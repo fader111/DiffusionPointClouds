@@ -1,8 +1,10 @@
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from torch_geometric.nn import knn_graph
-from torch_geometric.utils import to_dense_adj, dense_to_sparse, get_laplacian
-from utils import compute_dense_laplacian, compute_normalized_laplacian, compute_manual_laplacian
+# from torch_geometric.utils import to_dense_adj, dense_to_sparse, get_laplacian
+# from utils import compute_dense_laplacian, compute_normalized_laplacian, compute_manual_laplacian
+from torch_geometric.data import Data, DataLoader
+from torch_geometric.utils import degree
 
 # Custom dataset for point clouds
 class PointCloudDataset(Dataset):
@@ -21,22 +23,42 @@ class PointCloudDataset(Dataset):
     def __getitem__(self, idx):
         # Get the point cloud at the given index
         point_cloud = self.point_clouds[idx].reshape(-1, 3)  # shape {num_points, point_dim}
-        num_points, point_dim = point_cloud.shape
-
-        # Create edge_index using k-nearest neighbors (kNN)
-        edge_index = knn_graph(point_cloud, k=self.k, loop=False)  # shape {2, num_edges}
         
-        # Compute adjacency matrix from edge_index
-        adj_matrix = to_dense_adj(edge_index, max_num_nodes=num_points)[0]  # shape {num_points, num_points}
+        # Create edge_index using k-nearest neighbors (kNN)
+        edge_index = knn_graph(point_cloud, k=self.k, loop=False)  # shape: [2, num_edges]
 
-        # Compute the Laplacian (D - A) and return it as sparse representation
-        # laplacian = compute_dense_laplacian(edge_index, num_points)
-        # Or normalized 
-        laplacian = compute_manual_laplacian(edge_index, num_points)
-        # laplacian, _ = get_laplacian(edge_index, normalization="sym")
+        # Compute Laplacian (sparse form using edge weights)
+        edge_weight = self.compute_edge_weight(edge_index, point_cloud.size(0))
 
+        # Prepare data for PyTorch Geometric Data object
+        data = Data(x=point_cloud, edge_index=edge_index, edge_weight=edge_weight)
 
-        return point_cloud, edge_index, laplacian
+        return data
+
+    def compute_edge_weight(self, edge_index, num_nodes):
+        """
+        Compute edge weights corresponding to the Laplacian matrix in sparse form.
+        
+        Args:
+            edge_index (Tensor): Edge indices for the graph.
+            num_nodes (int): Number of nodes (points) in the graph.
+        
+        Returns:
+            edge_weight (Tensor): Edge weights corresponding to the Laplacian.
+        """
+        # Compute degree for each node
+        row, col = edge_index
+        deg = degree(row, num_nodes=num_nodes, dtype=torch.float)
+
+        # Compute edge weights for Laplacian: L = D - A
+        edge_weight = torch.ones(edge_index.size(1), dtype=torch.float)  # Adjacency weights (1 for each edge)
+        deg_inv_sqrt = deg.pow(-0.5)
+        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
+
+        # Apply normalized Laplacian: D^{-0.5} A D^{-0.5}
+        edge_weight = deg_inv_sqrt[row] * edge_weight * deg_inv_sqrt[col]
+
+        return edge_weight
 
 if __name__ == "__main__":
     
@@ -51,10 +73,8 @@ if __name__ == "__main__":
 
     # Example training loop
     for batch in train_loader:
-        point_clouds, edge_indices, laplacians = batch
-        # point_clouds: List of point clouds, shape {batch_size, num_points, point_dim}
-        # edge_indices: List of edge_index for each point cloud
-        # laplacians: List of laplacian tensors for each point cloud
-        # Pass to your model for training
-        # print(f"point_clouds, edge_indices, laplacians shapes\n{point_clouds.shape}, {edge_indices.shape}, {laplacians.shape}")
-        print(f"{point_clouds.shape}, {edge_indices.shape}, {laplacians.shape}")
+        x = batch.x  # Node features for all graphs in the batch
+        edge_index = batch.edge_index  # Edge indices for all graphs in the batch
+        edge_weight = batch.edge_weight  # Edge weights (Laplacian) for all graphs in the batch
+        print(f"{x.shape}, {edge_index.shape}, {edge_weight.shape}")
+        # print(f"{x.shape}, {len(edge_index)}")

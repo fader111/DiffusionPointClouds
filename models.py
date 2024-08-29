@@ -36,16 +36,16 @@ class Decoder(torch.nn.Module):
         x = self.diffusion2(x, edge_index, edge_weight)
         return x
 
-class DiffusionNetAutoencoder(nn.Module):
+class DiffusionNetAutoencoder(torch.nn.Module):
     def __init__(self, in_features, hidden_features, latent_dim):
         super(DiffusionNetAutoencoder, self).__init__()
         self.encoder = Encoder(in_features, hidden_features, latent_dim)
         self.decoder = Decoder(latent_dim, hidden_features, in_features)
 
-    def forward(self, x, edge_index, laplacian):
+    def forward(self, x, edge_index, edge_weight):
         # Encode to latent space
-        latent = self.encoder(x, edge_index, laplacian)
+        latent = self.encoder(x, edge_index, edge_weight)
         # Decode back to original space
-        reconstructed = self.decoder(latent, edge_index, laplacian)
+        reconstructed = self.decoder(latent, edge_index, edge_weight)
         return reconstructed
 
