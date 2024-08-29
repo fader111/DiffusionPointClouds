@@ -3,37 +3,37 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import ChebConv  # Using Chebyshev convolution
 
-class DiffusionNetLayer(torch.nn.Module):
+class DiffusionNetLayer(nn.Module):
     def __init__(self, in_features, out_features, K=6):
         super(DiffusionNetLayer, self).__init__()
-        # Chebyshev convolution approximates diffusion on graphs
+        # Chebyshev convolution approximates the diffusion on graphs
         self.conv = ChebConv(in_features, out_features, K)
 
-    def forward(self, x, edge_index, edge_weight=None):
-        # Perform the convolution on the graph using edge weights (sparse Laplacian)
-        x = self.conv(x, edge_index, edge_weight=edge_weight)
+    def forward(self, x, edge_index, laplacian):
+        # Perform the convolution on the graph defined by edge_index
+        x = self.conv(x, edge_index, laplacian)
         return F.relu(x)
 
-class Encoder(torch.nn.Module):
+class Encoder(nn.Module):
     def __init__(self, in_features, hidden_features, latent_dim):
         super(Encoder, self).__init__()
         self.diffusion1 = DiffusionNetLayer(in_features, hidden_features)
         self.diffusion2 = DiffusionNetLayer(hidden_features, latent_dim)
 
-    def forward(self, x, edge_index, edge_weight):
-        x = self.diffusion1(x, edge_index, edge_weight)
-        x = self.diffusion2(x, edge_index, edge_weight)
+    def forward(self, x, edge_index, laplacian):
+        x = self.diffusion1(x, edge_index, laplacian)
+        x = self.diffusion2(x, edge_index, laplacian)
         return x
 
-class Decoder(torch.nn.Module):
+class Decoder(nn.Module):
     def __init__(self, latent_dim, hidden_features, out_features):
         super(Decoder, self).__init__()
         self.diffusion1 = DiffusionNetLayer(latent_dim, hidden_features)
         self.diffusion2 = DiffusionNetLayer(hidden_features, out_features)
 
-    def forward(self, x, edge_index, edge_weight):
-        x = self.diffusion1(x, edge_index, edge_weight)
-        x = self.diffusion2(x, edge_index, edge_weight)
+    def forward(self, x, edge_index, laplacian):
+        x = self.diffusion1(x, edge_index, laplacian)
+        x = self.diffusion2(x, edge_index, laplacian)
         return x
 
 class DiffusionNetAutoencoder(nn.Module):
