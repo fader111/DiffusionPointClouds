@@ -19,6 +19,31 @@ def compute_edge_indices(point_cloud, k=6):
     edge_index = knn_graph(point_cloud, k=k, loop=False)
     return edge_index
 
+def compute_batched_edge_indices(X, k=6):
+    """
+    Compute edge indices for a batch of point clouds using k-nearest neighbors.
+    
+    Parameters:
+        X (torch.Tensor): A tensor of shape [batch_size, num_points, num_features] representing the batched point cloud.
+        k (int): Number of nearest neighbors to compute for each point.
+        device (str): Device to move the tensors to (e.g., 'cuda' or 'cpu').
+
+    Returns:
+        torch.Tensor: Edge index tensor representing the k-NN graph for the entire batch.
+    """
+    batch_size, num_points, num_features = X.size()
+    
+    # Flatten the batch of point clouds into a single point cloud of shape [batch_size * num_points, num_features]
+    X_flat = X.view(batch_size * num_points, num_features).to(X.device)
+    
+    # Create a batch index tensor that indicates which point belongs to which batch element
+    batch_index = torch.arange(batch_size, device=X.device).repeat_interleave(num_points)
+    
+    # Compute the edge index for the entire batch using k-NN
+    edge_index = knn_graph(X_flat, k=k, batch=batch_index, loop=False).to(X.device)
+    
+    return edge_index
+
 def compute_laplacian(edge_index, num_nodes):
     """
     Compute the Laplacian matrix from the edge indices.
@@ -38,7 +63,7 @@ def compute_laplacian(edge_index, num_nodes):
     deg = degree(row, num_nodes=num_nodes, dtype=torch.float32)
 
     # Compute normalized Laplacian weights (L = D - A)
-    edge_weight = torch.ones((edge_index.size(1), ), dtype=torch.float32)  # Weight all edges equally
+    edge_weight = torch.ones((edge_index.size(1), ))  # Weight all edges equally
     deg_inv_sqrt = deg.pow(-0.5)
     deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0  # Avoid division by zero
 
