@@ -39,13 +39,7 @@ class EmbedderDataset(Dataset):
     
 
 if __name__ == '__main__':
-    # нужно существенно больше данных. 
-    # и сохранять stl файлы не вариант. 
-    # поэтому сохраняем stl временно, ( или может не временно а просто наделать все stl в педро обычной валидацией)
-    # освободив предварительно место на диске... 
-    # наверное лучше сохранить. не понятно сколько точек на зуб понадобится. может придется менять. 
-    #
-    # stl_dir =r"E:\awsCollectedDataPeydroNew_2024\stl"
+
     stl_dir =r"E:\awsCollectedDataPedro\stl"
     dataset_dir = "datasets_embedded"
     points_per_shape = 256
@@ -57,6 +51,8 @@ if __name__ == '__main__':
 
     for filename in files:#[:10]: # debug 10 Items!!!!!!!!!!!!!
         mesh = load_mesh_fr_stl_file(filename)
+        # convert meshes to head coordinates
+        
         points = get_points(mesh, points_per_shape)
         data.append(points)
     
