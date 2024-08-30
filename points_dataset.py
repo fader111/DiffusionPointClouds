@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import trimesh
 import torch
 from torch.utils.data import Dataset
+from scipy.spatial.transform import Rotation as R
 
 # создаем датасет из stl файлов преобразуем mesh в облако точек, восстанавливаем его же
 # id зуба не важен 
@@ -23,6 +24,20 @@ def load_stl_filenames(dir_path):
             files_only.append(os.path.join(root, file))
     return files_only
 
+def get_mesh_rt(filename): 
+    "get quaternions and translation from json file"
+    with open(filename, 'r') as f:
+        # data = json.load(f)
+        ...
+
+def convert_to_head(mesh, filename):
+    quaternion, translation = get_mesh_rt(filename)
+    rotation = R.from_quat(quaternion).as_matrix()
+    rotated_vertices = mesh.vertices @ rotation.T
+    translated_vertices = rotated_vertices + np.array(translation)
+    mesh.vertices = translated_vertices
+    return mesh
+    
 class EmbedderDataset(Dataset):
     def __init__(self, data, points_per_shape, point_dim=3):
         super(EmbedderDataset, self).__init__()
@@ -41,6 +56,7 @@ class EmbedderDataset(Dataset):
 if __name__ == '__main__':
 
     stl_dir =r"E:\awsCollectedDataPedro\stl"
+    stl_dir =r"D:\Projects\webteeth-cra\public\meshes"
     dataset_dir = "datasets_embedded"
     points_per_shape = 256
     dataset_fname = f"ds_{points_per_shape}.pth"
@@ -51,8 +67,9 @@ if __name__ == '__main__':
 
     for filename in files:#[:10]: # debug 10 Items!!!!!!!!!!!!!
         mesh = load_mesh_fr_stl_file(filename)
-        # convert meshes to head coordinates
-        
+        # convert meshes to head coordinates if needed
+        mesh = convert_to_head(mesh, filename)
+
         points = get_points(mesh, points_per_shape)
         data.append(points)
     
