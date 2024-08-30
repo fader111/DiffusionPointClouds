@@ -14,26 +14,41 @@ class DiffusionNetLayer(torch.nn.Module):
         x = self.conv(x, edge_index, edge_weight=edge_weight)
         return F.relu(x)
 
+class DiffusionNetLayerLinear(torch.nn.Module):
+    def __init__(self, in_features, out_features, K=6):
+        super(DiffusionNetLayer, self).__init__()
+        # Chebyshev convolution approximates diffusion on graphs
+        self.conv = ChebConv(in_features, out_features, K)
+
+    def forward(self, x, edge_index, edge_weight=None):
+        # Perform the convolution on the graph using edge weights (sparse Laplacian)
+        x = self.conv(x, edge_index, edge_weight=edge_weight)
+        return x # wo Relu Activation
+    
 class Encoder(torch.nn.Module):
     def __init__(self, in_features, hidden_features, latent_dim):
         super(Encoder, self).__init__()
         self.diffusion1 = DiffusionNetLayer(in_features, hidden_features)
-        self.diffusion2 = DiffusionNetLayer(hidden_features, latent_dim)
+        self.diffusion2 = DiffusionNetLayer(hidden_features, hidden_features)
+        self.diffusion3 = DiffusionNetLayerLinear(hidden_features, latent_dim)
 
     def forward(self, x, edge_index, edge_weight):
         x = self.diffusion1(x, edge_index, edge_weight)
         x = self.diffusion2(x, edge_index, edge_weight)
+        x = self.diffusion3(x, edge_index, edge_weight)
         return x
 
 class Decoder(torch.nn.Module):
     def __init__(self, latent_dim, hidden_features, out_features):
         super(Decoder, self).__init__()
         self.diffusion1 = DiffusionNetLayer(latent_dim, hidden_features)
-        self.diffusion2 = DiffusionNetLayer(hidden_features, out_features)
+        self.diffusion2 = DiffusionNetLayer(hidden_features, hidden_features)
+        self.diffusion3 = DiffusionNetLayerLinear(hidden_features, out_features)
 
     def forward(self, x, edge_index, edge_weight):
         x = self.diffusion1(x, edge_index, edge_weight)
         x = self.diffusion2(x, edge_index, edge_weight)
+        x = self.diffusion3(x, edge_index, edge_weight)
         return x
 
 class DiffusionNetAutoencoder(torch.nn.Module):
@@ -47,5 +62,5 @@ class DiffusionNetAutoencoder(torch.nn.Module):
         latent = self.encoder(x, edge_index, edge_weight)
         # Decode back to original space
         reconstructed = self.decoder(latent, edge_index, edge_weight)
-        return reconstructed
+        return reconstructed, latent
 
