@@ -16,7 +16,7 @@ class DiffusionNetLayer(torch.nn.Module):
 
 class DiffusionNetLayerLinear(torch.nn.Module):
     def __init__(self, in_features, out_features, K=6):
-        super(DiffusionNetLayer, self).__init__()
+        super(DiffusionNetLayerLinear, self).__init__()
         # Chebyshev convolution approximates diffusion on graphs
         self.conv = ChebConv(in_features, out_features, K)
 
