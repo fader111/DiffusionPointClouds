@@ -1,4 +1,6 @@
 models/
+models_256/
+models_1024/
 models_.py
 __pycache__/
 models_.py
