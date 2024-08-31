@@ -1,43 +1,16 @@
 import os
+# import json
 import numpy as np
 import plotly.graph_objects as go
-import trimesh
+# import trimesh
 import torch
 from torch.utils.data import Dataset
-from scipy.spatial.transform import Rotation as R
+from utils import *
 
 # создаем датасет из stl файлов преобразуем mesh в облако точек, восстанавливаем его же
 # id зуба не важен 
 # 
 
-def load_mesh_fr_stl_file(stl_file_path):
-    return trimesh.load_mesh(stl_file_path)
-
-def get_points(mesh, count = 1024):
-    points, var = trimesh.sample.sample_surface_even(mesh, count = count)
-    return points
-
-def load_stl_filenames(dir_path):
-    files_only = []
-    for root, dirs, files in os.walk(dir_path):
-        for file in files:
-            files_only.append(os.path.join(root, file))
-    return files_only
-
-def get_mesh_rt(filename): 
-    "get quaternions and translation from json file"
-    with open(filename, 'r') as f:
-        # data = json.load(f)
-        ...
-
-def convert_to_head(mesh, filename):
-    quaternion, translation = get_mesh_rt(filename)
-    rotation = R.from_quat(quaternion).as_matrix()
-    rotated_vertices = mesh.vertices @ rotation.T
-    translated_vertices = rotated_vertices + np.array(translation)
-    mesh.vertices = translated_vertices
-    return mesh
-    
 class EmbedderDataset(Dataset):
     def __init__(self, data, points_per_shape, point_dim=3):
         super(EmbedderDataset, self).__init__()
@@ -55,23 +28,35 @@ class EmbedderDataset(Dataset):
 
 if __name__ == '__main__':
 
-    stl_dir =r"E:\awsCollectedDataPedro\stl"
-    stl_dir =r"D:\Projects\webteeth-cra\public\meshes"
-    dataset_dir = "datasets_embedded"
-    points_per_shape = 256
-    dataset_fname = f"ds_{points_per_shape}.pth"
-    # root, dirs, files = load_stl_filenames(stl_dir)
-    # print(f"root, dirs, files {root, dirs, files}")
-    files = load_stl_filenames(stl_dir)
+    main_dir = r"E:\awsCollectedDataPedro"
+    stl_dir = os.path.join(main_dir, "stl") 
+    json_dir = os.path.join(main_dir, "collected_json_unmov_teeth")
+    dataset_dir = "dataset_points"
+
+    points_per_shape = 1024
+
+    dataset_fname = f"ds_{points_per_shape}_head.pth"
+    
+    stl_folders = get_stl_folders(stl_dir) #[:3] # debug !!!!!!!!!!!!!!
     data = []
 
-    for filename in files:#[:10]: # debug 10 Items!!!!!!!!!!!!!
-        mesh = load_mesh_fr_stl_file(filename)
-        # convert meshes to head coordinates if needed
-        mesh = convert_to_head(mesh, filename)
+    for stl_folder in stl_folders:
+        json_fname = os.path.join(json_dir, os.path.basename(stl_folder) + ".json")
+        try:
+            teeth_rt = get_teeth_rt(json_fname)
+        except:
+            print(f"json file not found {json_fname}")
+            continue
+        stl_filenames = load_stl_filenames(stl_folder)
+        for stl_filename in stl_filenames:
+            mesh = load_mesh_fr_stl_file(stl_filename)
 
-        points = get_points(mesh, points_per_shape)
-        data.append(points)
+            # convert meshes to head coordinates if needed
+            tooth_id = os.path.splitext(os.path.basename(stl_filename))[0]
+            mesh = convert_to_head(mesh, teeth_rt[tooth_id]) 
+
+            points = get_points(mesh, points_per_shape)
+            data.append(points)
     
     np_data = np.array(data, dtype=np.float32)
     # print(f"stls {files} {len(files)}")

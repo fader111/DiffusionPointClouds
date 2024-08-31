@@ -1,88 +1,44 @@
-import torch
-from torch_geometric.nn import knn_graph
-from torch_geometric.utils import to_dense_adj
-from torch_geometric.utils import degree
+import os
+import json
+import numpy as np
+import plotly.graph_objects as go
+import trimesh
+from scipy.spatial.transform import Rotation as R
 
-# Custom function to compute dense Laplacian
-def compute_dense_laplacian(edge_index, num_nodes):
-    """
-    Compute the unnormalized Laplacian matrix L = D - A in dense format.
-    
-    Args:
-        edge_index: Edge indices of the graph {2, num_edges}.
-        num_nodes: Number of nodes in the graph.
-    
-    Returns:
-        laplacian: Dense Laplacian matrix {num_nodes, num_nodes}.
-    """
-    # Compute the dense adjacency matrix A
-    adj_matrix = to_dense_adj(edge_index, max_num_nodes=num_nodes)[0]  # {num_nodes, num_nodes}
+def load_mesh_fr_stl_file(stl_file_path):
+    return trimesh.load_mesh(stl_file_path)
 
-    # Compute the degree matrix D
-    degree_matrix = torch.diag(adj_matrix.sum(dim=1))  # {num_nodes, num_nodes}
+def get_points(mesh, count = 1024):
+    points, var = trimesh.sample.sample_surface_even(mesh, count = count)
+    return points
 
-    # Compute the Laplacian L = D - A
-    laplacian = degree_matrix - adj_matrix
+def load_stl_filenames(dir_path):
+    files_only = []
+    for root, dirs, files in os.walk(dir_path):
+        for file in files:
+            files_only.append(os.path.join(root, file))
+    return files_only
 
-    return laplacian
+def get_stl_folders(dir_path):
+    dirs = []
+    [dirs.append(os.path.join(dir_path, d)) for d in os.listdir(dir_path)] 
+    return dirs
 
-def compute_normalized_laplacian(edge_index, num_nodes):
-    """
-    Compute the normalized Laplacian matrix Lsym = I - D^(-1/2) * A * D^(-1/2)
-    """
-    # Compute dense adjacency matrix A
-    adj_matrix = to_dense_adj(edge_index, max_num_nodes=num_nodes)[0]  # {num_nodes, num_nodes}
+def get_json_file_data(json_fname):
+    with open(json_fname, 'r') as f:
+        data = json.load(f)
+        return data
 
-    # Compute the degree matrix D
-    degree_matrix = adj_matrix.sum(dim=1)  # {num_nodes}
-    degree_inv_sqrt = torch.pow(degree_matrix, -0.5)
-    degree_inv_sqrt[degree_inv_sqrt == float('inf')] = 0  # Handle division by zero
+def get_teeth_rt(json_fname): 
+    "get quaternions and translation from json file"
+    json_file_data = get_json_file_data(json_fname)
+    teeth_transforms = json_file_data["Staging"][0]["ToothTransforms"]
+    return teeth_transforms
 
-    # Compute normalized Laplacian: I - D^(-1/2) A D^(-1/2)
-    D_inv_sqrt = torch.diag(degree_inv_sqrt)  # {num_nodes, num_nodes}
-    norm_laplacian = torch.eye(num_nodes) - D_inv_sqrt @ adj_matrix @ D_inv_sqrt
-
-    return norm_laplacian
-
-def compute_manual_laplacian(edge_index, num_nodes):
-    """
-    Manually compute the Laplacian matrix without changing the shape of edge_index.
-    
-    Parameters:
-        edge_index (torch.Tensor): Edge index tensor of shape [2, num_edges].
-        num_nodes (int): Number of nodes in the point cloud.
-
-    Returns:
-        torch.Tensor: Laplacian edge weights.
-    """
-    # Get degrees for each node
-    row, col = edge_index
-    deg = degree(row, num_nodes=num_nodes, dtype=torch.float32)
-
-    # Compute normalized Laplacian weights (L = D - A)
-    edge_weight = torch.ones((edge_index.size(1), ), dtype=torch.float32)  # Weight all edges equally
-    deg_inv_sqrt = deg.pow(-0.5)
-    deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0  # Avoid division by zero
-
-    # Apply normalization to the edge weights
-    edge_weight = deg_inv_sqrt[row] * edge_weight * deg_inv_sqrt[col]
-    
-    return edge_weight
-
-if __name__ == "__main__":
-
-    # Example usage compute_dense_laplacian
-    num_points = 100
-    point_dim = 3
-    point_cloud = torch.rand((num_points, point_dim))  # Point cloud with 100 points, 3D coordinates
-
-    # Compute edge_index using k-NN graph
-    edge_index = knn_graph(point_cloud, k=6, loop=False)  # {2, num_edges}
-
-    # Compute the dense Laplacian matrix
-    # laplacian = compute_dense_laplacian(edge_index, num_nodes=num_points)
-    # or normalized
-    # laplacian = compute_normalized_laplacian(edge_index, num_nodes=num_points)
-    # or manually
-    laplacian = compute_manual_laplacian(edge_index, num_nodes=num_points)
-    print(laplacian.shape)  # Output: torch.Size([100, 100])
+def convert_to_head(mesh, tooth_rt):
+    quaternion, translation = list(tooth_rt["rotation"].values()), list(tooth_rt["translation"].values())
+    rotation = R.from_quat(quaternion).as_matrix()
+    rotated_vertices = mesh.vertices @ rotation.T
+    translated_vertices = rotated_vertices + np.array(translation, dtype=np.float64)
+    mesh.vertices = translated_vertices
+    return mesh
