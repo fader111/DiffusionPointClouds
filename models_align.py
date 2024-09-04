@@ -3,7 +3,7 @@ import torch.nn as nn
 # import torch.nn.functional as F
 # from torch_geometric.nn import ChebConv  # Using Chebyshev convolution
 
-def get_autoencoder(dense_dim, dim_code):
+def autoencoder(dense_dim, dim_code):
     return nn.Sequential( # основной рабочий
             nn.Linear(dense_dim, dense_dim), # Это полносвязный слой
             nn.ELU(),

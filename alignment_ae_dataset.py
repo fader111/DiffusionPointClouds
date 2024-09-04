@@ -54,7 +54,7 @@ def get_case_data(stl_folder, json_dir, encoder, decoder, num_points, k):
             return
 
         batches = [PointCloudDataset((torch.from_numpy(point_cloud_data),), k=k) for point_cloud_data in point_clouds_data]
-        embeddings = [encoder(batch[0].x, batch[0].edge_index, batch[0].edge_weight) for batch in batches]
+        embeddings = [encoder(batch[0].x, batch[0].edge_index, batch[0].edge_weight).detach().cpu().numpy() for batch in batches]
         output.append(embeddings)
 
     return output
@@ -78,7 +78,7 @@ def get_dataset_data(main_dir, stl_dir, json_dir, encoder_states_file_path, deco
 
     ds_data = []
 
-    for i, stl_folder in enumerate(os.listdir(stl_dir)[900:]):
+    for i, stl_folder in enumerate(os.listdir(stl_dir)[:10]):
         if not os.path.isdir(os.path.join(stl_dir, stl_folder)):
             continue
         case_data = get_case_data(os.path.join(stl_dir, stl_folder), json_dir, encoder, decoder, num_points, k)
@@ -88,7 +88,7 @@ def get_dataset_data(main_dir, stl_dir, json_dir, encoder_states_file_path, deco
         if i % 100 == 0:
             print(f"processed {i}/{len(os.listdir(stl_dir))} cases")
 
-    return ds_data
+    return np.array(ds_data, dtype=np.float32)
 
 
 class AlignerDataset(Dataset):
@@ -99,7 +99,7 @@ class AlignerDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return self.data[idx][0], self.data[idx][1]
+        return torch.from_numpy(self.data[idx][0]), torch.from_numpy(self.data[idx][1])
 
 
 if __name__ == "__main__":
@@ -116,6 +116,7 @@ if __name__ == "__main__":
     ds = AlignerDataset(ds_data) 
     # ds_data - [case, case, ...] где case = [t1, t2] t1 = [зуб1, зуб2, ..., зуб32] зуб.shape[256,32]
     ds_folder = "datasets_align"
-    # вычисления занимают много место в памяти 
-    torch.save(ds, os.path.join(ds_folder, "ds_256_3.pth"))
+    # вычисления занимают много место в памяти вычисляем датасет по частям, 
+    # сохраняем части и конкатенируем их.
+    torch.save(ds, os.path.join(ds_folder, "dataset_256.pth"))
     print(f"ds length {len(ds)}")
