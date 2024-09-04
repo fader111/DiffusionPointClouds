@@ -23,7 +23,7 @@ class PointCloudDataset(Dataset):
 
     def __getitem__(self, idx):
         # Get the point cloud at the given index
-        point_cloud = self.point_clouds[idx].reshape(-1, self.num_points*self.point_dim)  # shape {num_points, point_dim}
+        point_cloud = self.point_clouds[idx].reshape(-1, self.point_dim)  # shape {num_points, point_dim}
         
         # Create edge_index using k-nearest neighbors (kNN)
         edge_index = knn_graph(point_cloud, k=self.k, loop=False)  # shape: [2, num_edges]
