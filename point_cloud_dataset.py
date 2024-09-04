@@ -7,7 +7,7 @@ from torch_geometric.utils import degree
 
 # Custom dataset for point clouds
 class PointCloudDataset(Dataset):
-    def __init__(self, point_clouds, k=6):
+    def __init__(self, point_clouds, k=6, point_dim=3, num_points=256):
         """
         Args:
             point_clouds: List of point cloud tensors, each of shape {num_points, point_dim}.
@@ -15,13 +15,15 @@ class PointCloudDataset(Dataset):
         """
         self.point_clouds = point_clouds
         self.k = k  # k-nearest neighbors
+        self.point_dim = point_dim
+        self.num_points = num_points
 
     def __len__(self):
         return len(self.point_clouds)
 
     def __getitem__(self, idx):
         # Get the point cloud at the given index
-        point_cloud = self.point_clouds[idx].reshape(-1, 3)  # shape {num_points, point_dim}
+        point_cloud = self.point_clouds[idx].reshape(-1, self.num_points*self.point_dim)  # shape {num_points, point_dim}
         
         # Create edge_index using k-nearest neighbors (kNN)
         edge_index = knn_graph(point_cloud, k=self.k, loop=False)  # shape: [2, num_edges]

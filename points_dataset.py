@@ -33,20 +33,19 @@ if __name__ == '__main__':
     json_dir = os.path.join(main_dir, "collected_json_unmov_teeth")
     dataset_dir = "dataset_points"
 
-    points_per_shape = 1024
+    points_per_shape = 256
 
     dataset_fname = f"ds_{points_per_shape}_head.pth"
     
     stl_folders = get_stl_folders(stl_dir) #[:3] # debug !!!!!!!!!!!!!!
     data = []
 
-    for stl_folder in stl_folders:
+    for i, stl_folder in enumerate(stl_folders):
         json_fname = os.path.join(json_dir, os.path.basename(stl_folder) + ".json")
-        try:
-            teeth_rt = get_teeth_rt(json_fname)
-        except:
+        if not os.path.isfile(json_fname):
             print(f"json file not found {json_fname}")
             continue
+        teeth_rt = get_teeth_rt(json_fname)
         stl_filenames = load_stl_filenames(stl_folder)
         for stl_filename in stl_filenames:
             mesh = load_mesh_fr_stl_file(stl_filename)
@@ -55,8 +54,12 @@ if __name__ == '__main__':
             tooth_id = os.path.splitext(os.path.basename(stl_filename))[0]
             mesh = convert_to_head(mesh, teeth_rt[tooth_id]) 
 
-            points = get_points(mesh, points_per_shape)
+            points, _ = trimesh.sample.sample_surface_even(mesh, count=points_per_shape)
+            if len(points) < points_per_shape: # sometimes samoling goes wrong
+                continue
             data.append(points)
+        if i%100 == 0: 
+            print(f"processed {i} / {len(stl_folders)}")
     
     np_data = np.array(data, dtype=np.float32)
     # print(f"stls {files} {len(files)}")
