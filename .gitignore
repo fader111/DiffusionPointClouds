@@ -1,11 +1,5 @@
-models/
-models_align/
-models_head/
-models_256/
-models_1024/
-models_.py
+models*/
 __pycache__/
-models_.py
 runs/
 dataset_points/
 datasets_align/

@@ -43,8 +43,14 @@ def get_case_data(stl_folder, json_dir, encoder, decoder, num_points, k):
         tooth_rigid_transforms = get_teeth_rt(json_fname, stage=stage) # -> dict with keys tooth_id and values dict with keys rotation and translation
 
         tooth_meshes = {tooth_id:convert_to_head(tooth_meshes[tooth_id], tooth_rigid_transforms[tooth_id]) for tooth_id in tooth_meshes}
-        point_clouds = {tooth_id:trimesh.sample.sample_surface_even(mesh, count=num_points)[0] for tooth_id, mesh in tooth_meshes.items()}
-    
+        # point_clouds = {tooth_id:trimesh.sample.sample_surface_even(mesh, count=num_points)[0] for tooth_id, mesh in tooth_meshes.items()}
+        point_clouds = {}
+        for tooth_id, mesh in tooth_meshes.items():
+            point_clouds[tooth_id] = trimesh.sample.sample_surface(mesh, count=num_points)[0]
+            if len(point_clouds[tooth_id]) < num_points:
+                print(f"wrong point num for case {stl_folder}")
+                return
+
         # тут надо сделать наборы облаков длиной 32 зуба чтобы отсутствующие зубы заменялись нулями в нужных позициях
         point_clouds_data = get_positioned_data(point_clouds, num_points=num_points) 
 
@@ -66,9 +72,9 @@ def get_dataset_data(main_dir, stl_dir, json_dir, encoder_states_file_path, deco
     json_dir = os.path.join(main_dir, json_dir)
 
     POINT_DIM = 3
-    hidden_features = 64
-    latent_dim = 32
-    num_points = 256
+    hidden_features = 32
+    latent_dim = 2
+    num_points = 128#256
 
     autoencoder = DiffusionNetAutoencoder(POINT_DIM, hidden_features, latent_dim)
     encoder = autoencoder.encoder
@@ -78,7 +84,7 @@ def get_dataset_data(main_dir, stl_dir, json_dir, encoder_states_file_path, deco
 
     ds_data = []
 
-    for i, stl_folder in enumerate(os.listdir(stl_dir)[:10]):
+    for i, stl_folder in enumerate(os.listdir(stl_dir)):
         if not os.path.isdir(os.path.join(stl_dir, stl_folder)):
             continue
         case_data = get_case_data(os.path.join(stl_dir, stl_folder), json_dir, encoder, decoder, num_points, k)
@@ -108,8 +114,8 @@ if __name__ == "__main__":
         main_dir="E:\\awsCollectedDataPedro",
         stl_dir="stl",
         json_dir="collected_json_unmov_teeth",
-        encoder_states_file_path="models_head/encoder_epoch_558.pth",
-        decoder_states_file_path="models_head/decoder_epoch_558.pth",
+        encoder_states_file_path="models3322/encoder_494.pth",
+        decoder_states_file_path="models3322/decoder_494.pth",
         k=6
     )
 
@@ -118,5 +124,6 @@ if __name__ == "__main__":
     ds_folder = "datasets_align"
     # вычисления занимают много место в памяти вычисляем датасет по частям, 
     # сохраняем части и конкатенируем их.
-    torch.save(ds, os.path.join(ds_folder, "dataset_256.pth"))
+    # torch.save(ds, os.path.join(ds_folder, "dataset_256.pth"))
+    torch.save(ds, os.path.join(ds_folder, "dataset_128.pth"))
     print(f"ds length {len(ds)}")
